@@ -20,7 +20,10 @@ export default function AdmissionScreen({ navigation }) {
     }
 
     // Navigate to the candidate list (HomeScreen)
-    navigation.navigate("Tab", { screen: "HomeTab", params: { userId: admissionNumber } });
+    navigation.navigate("Tab", {
+      screen: "HomeTab",
+      params: { userId: admissionNumber },
+    });
   };
 
   return (
@@ -50,6 +53,27 @@ export default function AdmissionScreen({ navigation }) {
       <TouchableOpacity style={styles.button} onPress={proceed}>
         <Text style={styles.buttonText}>Continue</Text>
       </TouchableOpacity>
+      <View style={{ paddingTop: 10 }}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => navigation.navigate("AdminLogin")}
+        >
+          <Text style={styles.buttonText}>Login As Admin</Text>
+        </TouchableOpacity>
+      </View>
+      {/* <TouchableOpacity
+        onLongPress={() => navigation.navigate("AdminLogin")}
+        style={{
+          position: "absolute",
+          top: 10,
+          right: 10,
+          width: 30,
+          height: 30,
+        }}
+      >
+        <View />
+        <Text>checking</Text>
+      </TouchableOpacity> */}
     </KeyboardAvoidingView>
   );
 }
