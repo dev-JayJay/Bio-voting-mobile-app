@@ -1,11 +1,15 @@
-// screens/FingerprintScreen.js
 import React from "react";
 import { View, Text, TouchableOpacity, Alert, StyleSheet } from "react-native";
 import * as LocalAuthentication from "expo-local-authentication";
+import axios from "axios";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function FingerprintScreen({ route, navigation }) {
+
   const { candidate, userId } = route.params;
+
+  const API_URL = "https://bio-mobile-server.vercel.app";
 
   const verifyFingerprint = async () => {
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -23,11 +27,35 @@ export default function FingerprintScreen({ route, navigation }) {
       promptMessage: "Confirm your identity",
     });
 
-    if (result.success) {
-      Alert.alert("Vote Confirmed", `You voted for ${candidate.name}`);
-      navigation.navigate("VoteSuccess", { candidate, userId });
-    } else {
+    if (!result.success) {
       Alert.alert("Authentication Failed", "Fingerprint not recognized.");
+      return;
+    }
+
+    // Biometric passed — submit vote
+    submitVote();
+  };
+
+  const submitVote = async () => {
+    try {
+      const res = await axios.post(`${API_URL}/vote/cast`, {
+        userId,
+        candidateId: candidate._id,
+      });
+
+      if (res.data.success) {
+        // Save locally so user can't vote again
+        const existingVotes = JSON.parse(await AsyncStorage.getItem("votedUsers")) || [];
+        existingVotes.push(userId);
+        await AsyncStorage.setItem("votedUsers", JSON.stringify(existingVotes));
+
+        navigation.navigate("VoteSuccess", { candidate });
+      } else {
+        Alert.alert("Error", res.data.message || "Could not submit vote.");
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Something went wrong while submitting your vote");
     }
   };
 
@@ -72,70 +100,15 @@ export default function FingerprintScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f4f7fb" },
-
-  header: {
-    paddingTop: 50,
-    paddingBottom: 15,
-    alignItems: "center",
-    backgroundColor: "#1E88E5",
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "white",
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: "#e0e0e0",
-  },
-
-  card: {
-    backgroundColor: "white",
-    marginHorizontal: 20,
-    marginTop: 25,
-    padding: 20,
-    borderRadius: 12,
-    elevation: 4,
-  },
-  label: {
-    color: "#777",
-    fontSize: 14,
-    marginTop: 5,
-  },
-  value: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#333",
-    marginBottom: 5,
-  },
-  valueSmall: {
-    fontSize: 14,
-    color: "#444",
-    marginTop: 5,
-  },
-
-  fingerprintArea: {
-    marginTop: 40,
-    alignItems: "center",
-  },
-  scanText: {
-    marginTop: 15,
-    fontSize: 16,
-    color: "#333",
-  },
-
-  verifyButton: {
-    marginTop: 40,
-    alignSelf: "center",
-    backgroundColor: "#1E88E5",
-    paddingVertical: 14,
-    paddingHorizontal: 40,
-    borderRadius: 30,
-    elevation: 3,
-  },
-  verifyText: {
-    color: "white",
-    fontWeight: "700",
-    fontSize: 18,
-  },
+  header: { paddingTop: 50, paddingBottom: 15, alignItems: "center", backgroundColor: "#1E88E5" },
+  headerTitle: { fontSize: 22, fontWeight: "700", color: "white" },
+  headerSubtitle: { fontSize: 14, color: "#e0e0e0" },
+  card: { backgroundColor: "white", marginHorizontal: 20, marginTop: 25, padding: 20, borderRadius: 12, elevation: 4 },
+  label: { color: "#777", fontSize: 14, marginTop: 5 },
+  value: { fontSize: 20, fontWeight: "700", color: "#333", marginBottom: 5 },
+  valueSmall: { fontSize: 14, color: "#444", marginTop: 5 },
+  fingerprintArea: { marginTop: 40, alignItems: "center" },
+  scanText: { marginTop: 15, fontSize: 16, color: "#333" },
+  verifyButton: { marginTop: 40, alignSelf: "center", backgroundColor: "#1E88E5", paddingVertical: 14, paddingHorizontal: 40, borderRadius: 30, elevation: 3 },
+  verifyText: { color: "white", fontWeight: "700", fontSize: 18 },
 });

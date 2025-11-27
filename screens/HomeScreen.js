@@ -1,40 +1,40 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, FlatList, Alert } from "react-native";
+import { View, Text, TouchableOpacity, FlatList, Alert, ActivityIndicator } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
 
-const candidates = [
-  {
-    id: "1",
-    name: "Abiola Adeyemi",
-    department: "Computer Science",
-    position: "SUG President",
-  },
-  {
-    id: "2",
-    name: "Chukwuemeka Okafor",
-    department: "Mechanical Engineering",
-    position: "Vice President",
-  },
-  {
-    id: "3",
-    name: "Fatimah Bello",
-    department: "Mass Communication",
-    position: "General Secretary",
-  },
-];
+export default function HomeScreen({ navigation, route }) {
+  const { userId } = route.params;
 
-export default function HomeScreen({ navigation, route  }) {
-      const { userId } = route.params;
   const [votedUsers, setVotedUsers] = useState([]);
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const API_URL = "https://bio-mobile-server.vercel.app";
 
   useEffect(() => {
     AsyncStorage.getItem("votedUsers").then((data) => {
       if (data) setVotedUsers(JSON.parse(data));
     });
+
+    fetchCandidates();
   }, []);
 
-  const handleVote = async (candidate) => {
+  console.log("checking hte cnaididate", candidates);
 
+  const fetchCandidates = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/candidate/list`);
+      setCandidates(res.data.candidates);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Failed to load candidates");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVote = (candidate) => {
     if (votedUsers.includes(userId)) {
       Alert.alert("Error", "You have already cast your vote!");
       return;
@@ -43,28 +43,8 @@ export default function HomeScreen({ navigation, route  }) {
     navigation.navigate("FaceVerification", { candidate, userId });
   };
 
-  const clearVotedUsers = async () => {
-    try {
-      // Remove both voted users and admission numbers
-      await AsyncStorage.removeItem("votedUsers");
-      await AsyncStorage.removeItem("votedAdmissionNumbers");
-
-      Alert.alert("Success", "All vote records have been cleared.");
-    } catch (error) {
-      console.error("Failed to clear votes:", error);
-      Alert.alert("Error", "Failed to clear vote records.");
-    }
-  };
-
   return (
-    <View
-      style={{
-        flex: 1,
-        padding: 20,
-        paddingVertical: 40,
-        backgroundColor: "#f7f7f7",
-      }}
-    >
+    <View style={{ flex: 1, padding: 20, paddingVertical: 40, backgroundColor: "#f7f7f7" }}>
       <Text
         style={{
           fontSize: 26,
@@ -87,9 +67,20 @@ export default function HomeScreen({ navigation, route  }) {
         Select a candidate to cast your vote
       </Text>
 
+      {/* Loading Spinner */}
+      {loading && <ActivityIndicator size="large" color="#0055ff" />}
+
+      {/* No Candidates */}
+      {!loading && candidates.length === 0 && (
+        <Text style={{ textAlign: "center", color: "#555", marginTop: 20 }}>
+          No candidates available
+        </Text>
+      )}
+
+      {/* Candidate List */}
       <FlatList
         data={candidates}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._id.toString()}
         renderItem={({ item }) => (
           <View
             style={{
@@ -103,16 +94,13 @@ export default function HomeScreen({ navigation, route  }) {
             <Text style={{ fontSize: 20, fontWeight: "600" }}>{item.name}</Text>
 
             <Text style={{ fontSize: 16, color: "#333", marginTop: 5 }}>
-              📘 Department:{" "}
-              <Text style={{ fontWeight: "600" }}>{item.department}</Text>
+              📘 Department: <Text style={{ fontWeight: "600" }}>{item.department}</Text>
             </Text>
 
             <Text style={{ fontSize: 16, color: "#333", marginTop: 3 }}>
-              🎯 Position:{" "}
-              <Text style={{ fontWeight: "600" }}>{item.position}</Text>
+              🎯 Position: <Text style={{ fontWeight: "600" }}>{item.position}</Text>
             </Text>
 
-            {/* Vote Button */}
             <TouchableOpacity
               onPress={() => handleVote(item)}
               style={{
@@ -130,18 +118,6 @@ export default function HomeScreen({ navigation, route  }) {
           </View>
         )}
       />
-      {/* <TouchableOpacity
-        style={{
-          padding: 15,
-          backgroundColor: "red",
-          borderRadius: 10,
-          marginBottom: 20,
-          alignItems: "center",
-        }}
-        onPress={clearVotedUsers}
-      >
-        <Text style={{ color: "white", fontSize: 16 }}>Reset Votes</Text>
-      </TouchableOpacity> */}
     </View>
   );
 }
