@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import axios from "axios";
 
-export default function ResultScreen() {
+export default function AdminResultScreen() {
   const [groupedResults, setGroupedResults] = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -29,8 +29,7 @@ export default function ResultScreen() {
         // GROUP BY POSITION NAME
         const groups = {};
         candidates.forEach((c) => {
-          const posName =
-            c.position?.name || "Unknown Position"; // fallback if missing
+          const posName = c.position?.name || "Unknown Position"; // fallback if missing
 
           if (!groups[posName]) groups[posName] = [];
           groups[posName].push(c);
