@@ -5,11 +5,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MaterialIcons } from "@expo/vector-icons";
 
 export default function VoteSuccessScreen({ route, navigation }) {
-  const { candidate, userId } = route.params;
+  const { selectedCandidates, userId } = route.params || {};
+
+
+  const candidatesArray =
+    selectedCandidates && typeof selectedCandidates === "object"
+      ? Object.values(selectedCandidates)
+      : [];
 
   useEffect(() => {
     const recordVote = async () => {
-      // Store voted user IDs
       const votedUsers =
         JSON.parse((await AsyncStorage.getItem("votedUsers")) || "[]") || [];
 
@@ -18,21 +23,6 @@ export default function VoteSuccessScreen({ route, navigation }) {
       }
 
       await AsyncStorage.setItem("votedUsers", JSON.stringify(votedUsers));
-
-      // Store admission numbers
-      const admissionNumbers =
-        JSON.parse(
-          (await AsyncStorage.getItem("votedAdmissionNumbers")) || "[]"
-        ) || [];
-
-      if (!admissionNumbers.includes(userId)) {
-        admissionNumbers.push(userId);
-      }
-
-      await AsyncStorage.setItem(
-        "votedAdmissionNumbers",
-        JSON.stringify(admissionNumbers)
-      );
     };
 
     recordVote();
@@ -48,12 +38,21 @@ export default function VoteSuccessScreen({ route, navigation }) {
         You have successfully cast your vote for:
       </Text>
 
-      <View style={styles.candidateCard}>
-        <Text style={styles.candidateName}>{candidate.name}</Text>
-        <Text style={styles.details}>
-          {candidate.department} • {candidate.position}
+      {candidatesArray.length === 0 && (
+        <Text style={{ marginTop: 20, color: "red", fontSize: 16 }}>
+          No candidate data received.
         </Text>
-      </View>
+      )}
+
+      {candidatesArray.map((c, index) => (
+        <View key={index} style={styles.candidateCard}>
+          <Text style={styles.candidateName}>{c.name}</Text>
+
+          <Text style={styles.details}>
+            {c.department} • {c.position?.name || "Unknown Position"}
+          </Text>
+        </View>
+      ))}
 
       <TouchableOpacity
         style={styles.resultsButton}

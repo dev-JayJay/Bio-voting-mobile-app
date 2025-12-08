@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// screens/AdminScreen.js
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -8,126 +9,182 @@ import {
   Alert,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import axios from "axios";
+import { Picker } from "@react-native-picker/picker"; 
 
-export default function AdminScreen() {
-  const [sessionName, setSessionName] = useState("");
-  const [candidates, setCandidates] = useState([]);
-  const [candidateName, setCandidateName] = useState("");
-  const [department, setDepartment] = useState("");
-  const [position, setPosition] = useState("");
-  const [sessionActive, setSessionActive] = useState(false);
-
+export default function AdminScreen({ navigation, userId }) {
   const API_URL = "https://bio-mobile-server.vercel.app";
 
-  // Fetch current candidates
-  const fetchCandidates = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/candidate/list`);
-      setCandidates(res.data.candidates);
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to fetch candidates");
-    }
-  };
+  // Session
+  const [sessionName, setSessionName] = useState("");
+  const [sessionActive, setSessionActive] = useState(false);
 
-  // Check active session on load
-  const fetchSession = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/session/active`);
-      setSessionActive(res.data.session !== null);
-    } catch (error) {
-      console.error(error);
-    }
-  };
+  // Positions & Candidates
+  const [positions, setPositions] = useState([]); 
+  const [loadingPositions, setLoadingPositions] = useState(true);
+
+  const [candidates, setCandidates] = useState([]); 
+  const [loadingCandidates, setLoadingCandidates] = useState(true);
+
+  // Form for adding position / candidate
+  const [newPosition, setNewPosition] = useState("");
+  const [selectedPositionId, setSelectedPositionId] = useState("");
+  const [candidateName, setCandidateName] = useState("");
+  const [department, setDepartment] = useState("");
 
   useEffect(() => {
+    // initial load
+    fetchPositions();
     fetchCandidates();
     fetchSession();
   }, []);
 
-  // Start a new voting session
+  // ---------- Fetchers ----------
+  const fetchPositions = async () => {
+    setLoadingPositions(true);
+    try {
+      const res = await axios.get(`${API_URL}/position/list`);
+      // If server response shape is { success: true, positions: [...] } handle it:
+      const data = res.data.positions ?? res.data;
+      setPositions(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("fetchPositions:", err?.message ?? err);
+      Alert.alert("Error", "Could not load positions from server");
+    } finally {
+      setLoadingPositions(false);
+    }
+  };
+
+  const fetchCandidates = async () => {
+    setLoadingCandidates(true);
+    try {
+      const res = await axios.get(`${API_URL}/candidate/list`);
+      // server earlier used { success: true, candidates }
+      const data = res.data.candidates ?? res.data;
+      setCandidates(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("fetchCandidates:", err?.message ?? err);
+      Alert.alert("Error", "Failed to fetch candidates");
+    } finally {
+      setLoadingCandidates(false);
+    }
+  };
+
+  const fetchSession = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/session/active`);
+      const active = !!(res.data?.session ?? res.data);
+      setSessionActive(active);
+    } catch (err) {
+      console.error("fetchSession:", err?.message ?? err);
+    }
+  };
+
+  // ---------- Actions ----------
   const createSession = async () => {
     if (!sessionName.trim()) {
       Alert.alert("Error", "Please enter a session name");
       return;
     }
     try {
-      await axios.post(`${API_URL}/session/start`, {
-        name: sessionName,
-      });
-
+      await axios.post(`${API_URL}/session/start`, { name: sessionName });
       setSessionActive(true);
       Alert.alert("Success", `Session "${sessionName}" started`);
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error("createSession:", err?.message ?? err);
       Alert.alert("Error", "Failed to start session");
     }
   };
 
-  // End voting session
   const endSession = async () => {
     try {
       await axios.post(`${API_URL}/session/end`);
       setSessionActive(false);
       Alert.alert("Success", "Voting session ended");
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error("endSession:", err?.message ?? err);
       Alert.alert("Error", "Failed to end session");
     }
   };
 
-  // Add candidate
+  const addPosition = async () => {
+    if (!newPosition.trim()) {
+      Alert.alert("Error", "Please enter a position name");
+      return;
+    }
+
+    try {
+      const response = await axios.post(`${API_URL}/position/add`, {
+        name: newPosition.trim(),
+      });
+      setNewPosition("");
+      console.log("just added the position", response);
+      await fetchPositions();
+      Alert.alert("Success", "Position added");
+    } catch (err) {
+      // console.error("addPosition:", err?.message ?? err);
+      console.error("addPosition:", err);
+      // Alert.alert("Error", "Failed to add position");
+    }
+  };
+
   const addCandidate = async () => {
-    if (!candidateName.trim() || !department.trim() || !position.trim()) {
-      Alert.alert("Error", "Please fill all candidate details");
+    if (!candidateName.trim() || !department.trim() || !selectedPositionId) {
+      Alert.alert(
+        "Error",
+        "Please fill candidate name, department and select a position"
+      );
       return;
     }
 
     try {
       await axios.post(`${API_URL}/candidate/add`, {
-        name: candidateName,
-        department,
-        position,
+        name: candidateName.trim(),
+        department: department.trim(),
+        positionId: selectedPositionId,
       });
 
       setCandidateName("");
       setDepartment("");
-      setPosition("");
-      fetchCandidates();
-
+      await fetchCandidates();
       Alert.alert("Success", "Candidate added");
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error("addCandidate:", err?.message ?? err);
       Alert.alert("Error", "Failed to add candidate");
     }
   };
 
-  // Clear candidates and results
   const clearCandidates = async () => {
     try {
       await axios.delete(`${API_URL}/candidate/clear`);
       setCandidates([]);
-
       Alert.alert("Success", "Candidates cleared");
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error("clearCandidates:", err?.message ?? err);
       Alert.alert("Error", "Failed to clear candidates");
     }
   };
 
-  // Export results (PDF)
-  const exportResults = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/vote/results`);
+  const groupedByPosition = {};
+  candidates.forEach((c) => {
+    const posId =
+      c.position && typeof c.position === "object"
+        ? c.position._id
+        : c.position;
+    const posName =
+      c.position && typeof c.position === "object"
+        ? c.position.name
+        : (c.positionName ?? c.position);
+    if (!groupedByPosition[posId])
+      groupedByPosition[posId] = { name: posName || "Unknown", list: [] };
+    groupedByPosition[posId].list.push(c);
+  });
 
-      Alert.alert("Success", "Results fetched (PDF export coming next)");
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to fetch results");
-    }
-  };
+  const orphanPositionKeys = Object.keys(groupedByPosition).filter(
+    (pid) => !positions.find((p) => p._id === pid)
+  );
 
   return (
     <ScrollView style={styles.container}>
@@ -158,16 +215,60 @@ export default function AdminScreen() {
         )}
       </View>
 
+      {/* Position Creation */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Create Position</Text>
+
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <TextInput
+            style={[styles.input, { flex: 1 }]}
+            placeholder="e.g. President"
+            value={newPosition}
+            onChangeText={setNewPosition}
+          />
+          <TouchableOpacity
+            style={[styles.button, { paddingHorizontal: 16 }]}
+            onPress={addPosition}
+          >
+            <Text style={styles.buttonText}>Add</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={{ marginTop: 10, color: "#555" }}>
+          Existing positions:
+        </Text>
+        {loadingPositions ? (
+          <ActivityIndicator size="small" style={{ marginTop: 8 }} />
+        ) : positions.length === 0 ? (
+          <Text style={{ color: "#777", marginTop: 8 }}>No positions yet</Text>
+        ) : (
+          <View style={{ marginTop: 8 }}>
+            {positions.map((p) => (
+              <Text key={p._id} style={{ paddingVertical: 6 }}>
+                • {p.name}
+              </Text>
+            ))}
+          </View>
+        )}
+      </View>
+
       {/* Add Candidate */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Add Candidate</Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Candidate Name"
-          value={candidateName}
-          onChangeText={setCandidateName}
-        />
+        <Text style={{ marginBottom: 6, color: "#555" }}>Select Position</Text>
+        <View style={styles.pickerWrapper}>
+          <Picker
+            selectedValue={selectedPositionId}
+            onValueChange={(val) => setSelectedPositionId(val)}
+          >
+            <Picker.Item label="-- Select position --" value="" />
+            {positions.map((p) => (
+              <Picker.Item key={p._id} label={p.name} value={p._id} />
+            ))}
+          </Picker>
+        </View>
+
         <TextInput
           style={styles.input}
           placeholder="Department"
@@ -176,9 +277,9 @@ export default function AdminScreen() {
         />
         <TextInput
           style={styles.input}
-          placeholder="Position"
-          value={position}
-          onChangeText={setPosition}
+          placeholder="Candidate Name"
+          value={candidateName}
+          onChangeText={setCandidateName}
         />
 
         <TouchableOpacity style={styles.button} onPress={addCandidate}>
@@ -186,28 +287,59 @@ export default function AdminScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Candidate List */}
+      {/* Candidate List grouped by position */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Candidates</Text>
 
-        {candidates.length === 0 ? (
+        {(loadingCandidates || loadingPositions) && (
+          <ActivityIndicator size="large" color="#1E88E5" />
+        )}
+
+        {!loadingCandidates && candidates.length === 0 && (
           <Text style={{ color: "#555" }}>No candidates added</Text>
-        ) : (
-          <ScrollView nestedScrollEnabled={true}>
-            <FlatList
-              scrollEnabled={false}
-              data={candidates}
-              keyExtractor={(item) => item._id}
-              renderItem={({ item }) => (
-                <View style={styles.candidateCard}>
-                  <Text style={styles.candidateName}>{item.name}</Text>
-                  <Text style={styles.candidateDetail}>
-                    {item.department} • {item.position}
-                  </Text>
+        )}
+
+        {!loadingCandidates && candidates.length > 0 && (
+          <>
+            {/* Render in positions order */}
+            {positions.map((pos) => {
+              const group = groupedByPosition[pos._id];
+              if (!group || group.list.length === 0) return null;
+              return (
+                <View key={pos._id} style={styles.positionBlock}>
+                  <Text style={styles.positionTitle}>{pos.name}</Text>
+                  {group.list.map((c) => (
+                    <View key={c._id} style={styles.candidateCard}>
+                      <Text style={styles.candidateName}>{c.name}</Text>
+                      <Text style={styles.candidateDetail}>
+                        {c.department} • {pos.name}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
-              )}
-            />
-          </ScrollView>
+              );
+            })}
+
+            {/* Render any orphaned position groups (candidates whose position wasn't in positions[]) */}
+            {orphanPositionKeys.map((pid) => {
+              const group = groupedByPosition[pid];
+              return (
+                <View key={pid} style={styles.positionBlock}>
+                  <Text style={styles.positionTitle}>
+                    {group.name ?? "Unknown Position"}
+                  </Text>
+                  {group.list.map((c) => (
+                    <View key={c._id} style={styles.candidateCard}>
+                      <Text style={styles.candidateName}>{c.name}</Text>
+                      <Text style={styles.candidateDetail}>
+                        {c.department} • {group.name}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              );
+            })}
+          </>
         )}
       </View>
 
@@ -219,13 +351,14 @@ export default function AdminScreen() {
         >
           <Text style={styles.buttonText}>Clear Candidates</Text>
         </TouchableOpacity>
-
-        {/* <TouchableOpacity
-          style={[styles.button, { backgroundColor: "#1E88E5", marginTop: 10 }]}
-          onPress={exportResults}
+        <TouchableOpacity
+          style={[styles.button, { marginTop: 10 }]}
+          onPress={() =>
+            navigation.navigate("AdminResult", { userId })
+          }
         >
-          <Text style={styles.buttonText}>Export Results (PDF)</Text>
-        </TouchableOpacity> */}
+          <Text style={styles.buttonText}>View Results</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -256,11 +389,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonText: { color: "white", fontWeight: "700", fontSize: 16 },
+  pickerWrapper: {
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: "white",
+    marginBottom: 10,
+    overflow: "hidden",
+  },
+  positionBlock: { marginBottom: 16 },
+  positionTitle: { fontSize: 20, fontWeight: "700", marginBottom: 8 },
   candidateCard: {
     backgroundColor: "white",
     padding: 12,
     borderRadius: 10,
-    marginBottom: 10,
+    marginBottom: 8,
     elevation: 2,
   },
   candidateName: { fontSize: 16, fontWeight: "700" },

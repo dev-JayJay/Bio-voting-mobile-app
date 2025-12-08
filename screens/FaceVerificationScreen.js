@@ -1,10 +1,15 @@
-
 import React, { useRef, useState } from "react";
-import { View, Text, TouchableOpacity, Alert, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+} from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 
 export default function FaceVerificationScreen({ route, navigation }) {
-  const { candidate, userId } = route.params;
+  const { selectedCandidates, userId } = route.params;
   const cameraRef = useRef(null);
   const [facing, setFacing] = useState("front");
   const [permission, requestPermission] = useCameraPermissions();
@@ -19,8 +24,10 @@ export default function FaceVerificationScreen({ route, navigation }) {
         <Text style={styles.permissionText}>
           To continue with biometric verification, please enable your camera.
         </Text>
-
-        <TouchableOpacity onPress={requestPermission} style={styles.permissionBtn}>
+        <TouchableOpacity
+          onPress={requestPermission}
+          style={styles.permissionBtn}
+        >
           <Text style={styles.permissionBtnText}>Grant Permission</Text>
         </TouchableOpacity>
       </View>
@@ -30,9 +37,7 @@ export default function FaceVerificationScreen({ route, navigation }) {
   const captureAndVerify = async () => {
     if (!cameraRef.current || isCapturing) return;
     setIsCapturing(true);
-
-
-    navigation.navigate("Fingerprint", { candidate, userId });
+    navigation.navigate("Fingerprint", { selectedCandidates, userId });
   };
 
   return (
@@ -43,33 +48,48 @@ export default function FaceVerificationScreen({ route, navigation }) {
         <Text style={styles.headerSubtitle}>Face Verification</Text>
       </View>
 
-      {/* Candidate Info Card */}
-      <View style={styles.candidateCard}>
-        <Text style={styles.candidateName}>{candidate.name}</Text>
-        <Text style={styles.candidateDetail}>
-          Department: <Text style={styles.bold}>{candidate.department}</Text>
-        </Text>
-        <Text style={styles.candidateDetail}>
-          Position: <Text style={styles.bold}>{candidate.position}</Text>
-        </Text>
-      </View>
-
-      {/* Camera */}
-      <View style={styles.cameraWrapper}>
-        <CameraView ref={cameraRef} style={styles.camera} facing={facing} />
-
-        {/* Overlay */}
-        <View style={styles.overlay}>
-          <Text style={styles.overlayText}>Align your face within the frame</Text>
+      <ScrollView
+        style={{ flex: 1, width: "100%" }}
+        contentContainerStyle={{ paddingBottom: 20 }}
+      >
+        {/* Candidate Summary */}
+        <View style={styles.candidateCard}>
+          <Text style={styles.summaryTitle}>Your Selections</Text>
+          {Object.keys(selectedCandidates).map((pos) => {
+            const candidate = selectedCandidates[pos];
+            return (
+              <View key={candidate._id} style={styles.selectionItem}>
+                <Text style={styles.positionLabel}>{pos}</Text>
+                <Text style={styles.candidateName}>{candidate.name}</Text>
+                <Text style={styles.candidateDetail}>
+                  Department:{" "}
+                  <Text style={styles.bold}>{candidate.department}</Text>
+                </Text>
+              </View>
+            );
+          })}
         </View>
-      </View>
 
-      {/* Capture Button */}
-      <View style={styles.btnArea}>
-        <TouchableOpacity style={styles.captureBtn} onPress={captureAndVerify}>
-          <Text style={styles.captureText}>Capture Face</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Camera */}
+        <View style={styles.cameraWrapper}>
+          <CameraView ref={cameraRef} style={styles.camera} facing={facing} />
+          <View style={styles.overlay}>
+            <Text style={styles.overlayText}>
+              Align your face within the frame
+            </Text>
+          </View>
+        </View>
+
+        {/* Capture Button */}
+        <View style={styles.btnArea}>
+          <TouchableOpacity
+            style={styles.captureBtn}
+            onPress={captureAndVerify}
+          >
+            <Text style={styles.captureText}>Capture Face</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -83,15 +103,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#1E88E5",
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "white",
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: "#e0e0e0",
-  },
+  headerTitle: { fontSize: 22, fontWeight: "700", color: "white" },
+  headerSubtitle: { fontSize: 14, color: "#e0e0e0" },
 
   candidateCard: {
     backgroundColor: "white",
@@ -101,31 +114,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     elevation: 4,
   },
-  candidateName: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 5,
+  summaryTitle: { fontSize: 18, fontWeight: "700", marginBottom: 10 },
+  selectionItem: {
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+    paddingBottom: 10,
   },
-  candidateDetail: {
-    fontSize: 15,
-    color: "#333",
-    marginTop: 3,
-  },
+  positionLabel: { fontSize: 16, fontWeight: "700", color: "#1E88E5" },
+  candidateName: { fontSize: 16, fontWeight: "600", marginVertical: 2 },
+  candidateDetail: { fontSize: 14, color: "#333" },
   bold: { fontWeight: "700" },
 
   cameraWrapper: {
-    flex: 1,
+    height: 350,
     margin: 20,
     borderRadius: 18,
     overflow: "hidden",
     borderWidth: 3,
     borderColor: "#1E88E5",
   },
-
-  camera: {
-    flex: 1,
-  },
-
+  camera: { flex: 1 },
   overlay: {
     position: "absolute",
     bottom: 20,
@@ -141,10 +150,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  btnArea: {
-    paddingBottom: 25,
-    alignItems: "center",
-  },
+  btnArea: { paddingBottom: 25, alignItems: "center" },
   captureBtn: {
     backgroundColor: "#1E88E5",
     paddingVertical: 14,
@@ -152,13 +158,8 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     elevation: 3,
   },
-  captureText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "700",
-  },
+  captureText: { color: "white", fontSize: 18, fontWeight: "700" },
 
-  // Permission Screen
   permissionContainer: {
     flex: 1,
     justifyContent: "center",
